@@ -5,6 +5,8 @@ from tkcalendar import Calendar
 from tkscrolledframe import ScrolledFrame
 
 # program variables
+latest_program_version = 2.0
+user_program_version = 1.1
 window = Tk()
 window.title("Tasks")
 window.geometry("700x600")
