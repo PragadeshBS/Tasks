@@ -9,23 +9,15 @@ import urllib.error
 import webbrowser
 
 # program variables
-latest_program_version = 2.0
-user_program_version = 2.0
+latest_program_version = 2.1
+user_program_version = 2.1
+can_start = False
 to_update = False
 window = Tk()
 window.title("Tasks")
 window.geometry("1000x600")
 window.configure(background="#ffffff")
 window.resizable(False, False)
-data_files_parent_path = getcwd()
-icon_file_name = "logo.png"
-icon_file = path.join(data_files_parent_path, icon_file_name)
-logo = PhotoImage(file=icon_file)
-window.iconphoto(True, logo)
-main_data_file_name = "data.txt"
-tasks_data_file_name = "tasks.txt"
-main_data_file = path.join(data_files_parent_path, main_data_file_name)
-tasks_data_file = path.join(data_files_parent_path, tasks_data_file_name)
 update_loop = True
 time_greet_data = "Good morning"
 current_time = datetime.now()
@@ -35,33 +27,133 @@ pending_task_label = Label(window)
 font_style = "century gothic"
 about_top = top = None
 sort_method = IntVar()  # 0 - auto; 1 - manual
-user_name_var = StringVar()
 move_done_to_end = IntVar()
 move_done_to_end.set(1)
 task_highlighting = IntVar()
 task_highlighting.set(1)
 check_update_at_startup = IntVar()
 check_update_at_startup.set(1)
+current_screen = 1  # 1-home; 2- add task; 3 - edit task; 4 - reset; 5- sort settings; 6 - appearance settings
+# 7 - username change; 8 - update screen
 
-# images/icons
-up_arrow_image = PhotoImage(file="uparrow.png")
-down_arrow_image = PhotoImage(file="downarrow.png")
-top_arrow_image = PhotoImage(file="toparrow.png")
-bottom_arrow_image = PhotoImage(file="bottomarrow.png")
-back_button_image = PhotoImage(file="backarrow.png")
-done_button_image = PhotoImage(file="done.png")
-start_button_image = PhotoImage(file="start.png")
-add_new_image = PhotoImage(file="addnew.png")
-delete_image = PhotoImage(file="delete.png")
-create_image = PhotoImage(file="create.png")
-edit_done_image = PhotoImage(file="editdone.png")
-reset_image = PhotoImage(file="reset.png")
-exit_image = PhotoImage(file="exit.png")
-small_done_image = PhotoImage(file="smalldone.png")
-refresh_image = PhotoImage(file="refresh.png")
-refresh_2_image = PhotoImage(file="refresh2.png")
+# paths
+data_files_parent_path = getcwd()
+main_data_file_name = "data.txt"
+tasks_data_file_name = "tasks.txt"
+main_data_file = path.join(data_files_parent_path, main_data_file_name)
+tasks_data_file = path.join(data_files_parent_path, tasks_data_file_name)
+
+
+def error(code, sub_code):
+
+    if code == 1:
+        window.config(background="#ffffff")
+        init_screen()
+        window.title("Tasks - Critical Error")
+        Label(window, text="Runtime Error", bg="#ffffff", fg="red",
+              font=('calibri', 28, 'bold')).grid(columnspan=10, padx=(200, 0))
+        error_label_text = f"Error Code: {sub_code}\n\n\nWe've run into an error, the program " \
+                           f"files are corrupt" \
+                           f"\n\nResetting the program files might help, " \
+                           f"but you will lose all data associated with this program"
+        error_label = Label(window, text=error_label_text, bg="#ffffff", font=('calibri', 14))
+        error_label.grid(pady=(50, 10), columnspan=10, padx=(140, 0))
+        Button(window, text="Reset Data", cursor="hand2", relief="flat", command=reset_data, bg="#ffbcbc",
+               font=('calibri', 14), activebackground="#ffbcbc").grid(pady=50, column=5)
+        Button(window, text="Exit", cursor="hand2", relief="flat", command=window.destroy, bg="#bfffbc",
+               font=('calibri', 14), activebackground="#bfffbc").grid(pady=50, row=2, column=6)
+
+    if code == 3:
+        # code 3 for runtime error while sorting tasks and such, most probably restart would fix
+        window.config(background="#ffffff")
+        window.title("Tasks - Runtime Error")
+        Label(window, text="Runtime Error", bg="#ffffff", fg="red",
+              font=('calibri', 28, 'bold')).grid(columnspan=10, padx=(300, 0))
+        error_label_text = f"Error Code: {sub_code}\n\n\nWe've run into an error, something went really wrong :( " \
+                           f"\n\nRestarting the program might help"
+        error_label = Label(window, text=error_label_text, bg="#ffffff", font=('calibri', 14))
+        error_label.grid(pady=(50, 10), columnspan=10, padx=(200, 0))
+        Button(window, text="Exit", cursor="hand2", relief="flat", command=window.destroy, bg="#bfffbc",
+               font=('calibri', 14), activebackground="#bfffbc").grid(pady=50, row=2, columnspan=4, column=5)
+
+    if code == 4:
+        # Permission denied to write file
+        window.title("Tasks - Critical Error")
+        Label(window, text="Critical Error", bg="#ffffff",
+              fg="red", font=('calibri', 28, 'bold')).grid(columnspan=10, padx=(150, 0))
+        error_label_text = f"Error Code: {sub_code}\n\n\nWe've run into an error, something went " \
+                           f"wrong while we were looking for program files :(" \
+                           f"\n\nThis might be most probably caused " \
+                           f"if the program is installed in a restricted \nfolder and " \
+                           f"run without administrator privileges" \
+                           f"\n\n\n\nReinstalling the program might fix this issue"
+        error_label = Label(window, text=error_label_text, bg="#ffffff", font=('calibri', 14))
+        error_label.grid(pady=(50, 10), columnspan=10, padx=(140, 0))
+        Button(window, text="Exit", cursor="hand2", relief="flat", command=window.destroy, bg="#fff8f8",
+               font=('calibri', 14), activebackground="#fff8f8").grid(pady=50, row=2, columnspan=10,
+                                                                      padx=(150, 0))
+        return
+
+    if code == 5:
+        # initial file check failed
+        window.title("Tasks - Critical Error")
+        Label(window, text="Critical Error", bg="#ffffff",
+              fg="red", font=('calibri', 28, 'bold')).grid(columnspan=10, padx=(100, 0))
+        error_label_text = f"Error Code: {sub_code}\n\n\nWe've run into an error, something went " \
+                           f"wrong while we were looking for program files :(" \
+                           f"\n\nThis might be most probably caused " \
+                           f"if the program files were deleted or moved to another directory " \
+                           f"\n\n\n\nReinstalling the program might fix this issue"
+        error_label = Label(window, text=error_label_text, bg="#ffffff", font=('calibri', 14))
+        error_label.grid(pady=(50, 10), columnspan=10, padx=(100, 0))
+        Button(window, text="Exit", cursor="hand2", relief="flat", command=window.destroy, bg="#fff8f8",
+               font=('calibri', 14), activebackground="#fff8f8").grid(pady=50, row=2, columnspan=10,
+                                                                      padx=(100, 0))
+
+# paths
+
+
+try:
+
+    icon_file_name = "logo.png"
+    icon_file = path.join(data_files_parent_path, icon_file_name)
+
+    image_icon_files = ['logo.png', 'addnew.png', 'backarrow.png', 'bottomarrow.png',
+                         'create.png', 'delete.png', 'done.png', 'downarrow.png',
+                         'editdone.png', 'exit.png', 'logo.png', 'refresh.png', 'refresh2.png',
+                         'reset.png', 'smalldone.png', 'start.png', 'toparrow.png', 'uparrow.png']
+
+    for file in image_icon_files:
+        if not path.isfile(path.join(data_files_parent_path, file)):
+            raise TclError
+
+    # images/icons
+    logo = PhotoImage(file=icon_file)
+    window.iconphoto(True, logo)
+    up_arrow_image = PhotoImage(file="uparrow.png")
+    down_arrow_image = PhotoImage(file="downarrow.png")
+    top_arrow_image = PhotoImage(file="toparrow.png")
+    bottom_arrow_image = PhotoImage(file="bottomarrow.png")
+    back_button_image = PhotoImage(file="backarrow.png")
+    done_button_image = PhotoImage(file="done.png")
+    start_button_image = PhotoImage(file="start.png")
+    add_new_image = PhotoImage(file="addnew.png")
+    delete_image = PhotoImage(file="delete.png")
+    create_image = PhotoImage(file="create.png")
+    edit_done_image = PhotoImage(file="editdone.png")
+    reset_image = PhotoImage(file="reset.png")
+    exit_image = PhotoImage(file="exit.png")
+    small_done_image = PhotoImage(file="smalldone.png")
+    refresh_image = PhotoImage(file="refresh.png")
+    refresh_2_image = PhotoImage(file="refresh2.png")
+    can_start = True
+
+except TclError:
+    error(5, "FILE_NOT_FOUND")
+
 
 # data variables
+user_name_var = StringVar()
 user_name = ""
 no_tasks_pending = master_task_count = 0
 
@@ -97,7 +189,10 @@ class Task:
 
 
 def appearance_settings_screen():
+    global current_screen
+    current_screen = 6
     init_screen()
+    window.title("Tasks - Appearance Settings")
 
     back_button = Button(window, command=home_screen, activebackground="#ffffff", activeforeground="#565656",
                          image=back_button_image, font=("sans serif", 16, 'bold'), bg="#ffffff",
@@ -113,12 +208,74 @@ def appearance_settings_screen():
                                        variable=task_highlighting,
                                        font=(font_style, 16), command=update_main_data,
                                        bg="#ffffff", relief="flat", highlightthickness=0)
-    task_highlighting_cb.grid(columnspan=10, pady=(30, 0))
+    task_highlighting_cb.grid(columnspan=10, pady=(100, 0))
+
+
+def change_name_screen():
+    global user_name, user_name_var, current_screen
+    current_screen = 7
+    init_screen()
+    window.title("Tasks - Change User Name")
+
+    def place_submit_button():
+        nonlocal submit_button
+        global current_screen
+        if current_screen == 7:
+            submit_button.grid(row=3, columnspan=10, pady=100)
+
+    def validate_new_name():
+        global user_name
+        nonlocal new_name_entry, submit_button
+        to_check = new_name_entry.get()
+        to_check = to_check.strip()
+
+        if (len(to_check)) < 3 or (len(to_check) > 20):
+            submit_button.grid_forget()
+            short_m = Label(window, bg="#ffffff", font=(font_style, '14', 'bold'),
+                            text="Enter a name that is 3-20 characters in length", fg="#ff0000")
+            short_m.grid(row=4, column=0, columnspan=10, pady=100)
+            submit_button.after(2000, place_submit_button)
+            short_m.after(2000, short_m.grid_remove)
+            return
+
+        user_name = to_check
+        user_name_var.set(user_name)
+        update_main_data()
+        home_screen()
+        message = Label(window, text="User name was changed", bg="#ffffff",
+                        fg="#00af82", font=('calibri', 16), wraplength=250)
+        message.grid(row=1, column=1, columnspan=6)
+        message.after(2000, message.grid_remove)
+
+    back_button = Button(window, command=home_screen, activebackground="#ffffff", activeforeground="#565656",
+                         image=back_button_image, font=("sans serif", 16, 'bold'), bg="#ffffff",
+                         fg="#d33200", relief="flat", cursor="hand2")
+
+    back_button.grid(sticky="nw")
+
+    header_label = Label(window, text="Change User Name", bg="#ffffff", fg="#d33200",
+                         font=(font_style, 28))
+    header_label.grid(row=0, columnspan=10, padx=300, pady=(0, 20))
+
+    new_name_label_text = f"Hello {user_name}. Enter a new name: "
+    new_name_label = Label(window, text=new_name_label_text, font=('century gothic', 18), bg="#ffffff")
+    new_name_entry = Entry(window, textvariable=user_name_var, font=('calibri', 16),
+                           relief="flat", bg="#ffe9e9")
+
+    submit_button = Button(window, cursor="hand2", text="  Done", image=done_button_image,
+                           activebackground="#ffffff", bg="#ffffff", command=validate_new_name, relief="flat",
+                           font=('arial', 20), compound=LEFT)
+
+    new_name_label.grid(row=2, columnspan=6, pady=(100, 0))
+    new_name_entry.grid(row=2, columnspan=4, column=5, pady=(100, 0))
+    place_submit_button()
 
 
 def sort_settings_screen(first_run=False):
-    global sort_method
+    global sort_method, current_screen
+    current_screen = 5
     init_screen()
+    window.title("Tasks - Sort Settings")
 
     back_button = Button(window, command=home_screen, activebackground="#ffffff", activeforeground="#565656",
                          image=back_button_image, font=("sans serif", 16, 'bold'), bg="#ffffff",
@@ -150,7 +307,10 @@ def sort_settings_screen(first_run=False):
         rad_btn = Radiobutton(window, text=sort_methods[i], variable=sort_method,
                               value=i, bg="#ffffff", activebackground="#ffffff",
                               command=update_main_data, font=(font_style, 11))
-        rad_btn.grid(columnspan=8, column=2, pady=(15, 15), sticky="w")
+        if first_run:
+            rad_btn.grid(columnspan=5, column=1, pady=(15, 15), sticky="w")
+        else:
+            rad_btn.grid(columnspan=10, column=3, pady=(15, 15), sticky="w")
 
     if first_run:
         tip_label = Label(window, text="Tip: You can change this anytime from the edit menu",
@@ -166,7 +326,7 @@ def sort_settings_screen(first_run=False):
         move_to_end_cb = Checkbutton(window, text="Move completed tasks to end of list", variable=move_done_to_end,
                                      font=(font_style, 12), command=update_main_data,
                                      bg="#ffffff", relief="flat", highlightthickness=0)
-        move_to_end_cb.grid(columnspan=8, pady=(30, 0), column=2)
+        move_to_end_cb.grid(columnspan=10, column=1, pady=(30, 0))
 
 
 def about_screen():
@@ -186,6 +346,8 @@ def about_screen():
 
 
 def add_task_screen():
+    global current_screen
+    current_screen = 2
     due_date = datetime.today().date()
     window.title("Tasks - Add Task")
 
@@ -219,7 +381,9 @@ def add_task_screen():
 
     def place_submit_button():
         nonlocal submit_button
-        submit_button.grid(row=4, pady=50, columnspan=10)
+        global current_screen
+        if current_screen == 2:
+            submit_button.grid(row=4, pady=50, columnspan=10)
 
     def short_message(text):
         nonlocal submit_button
@@ -362,6 +526,8 @@ def update_main_data():
 
 
 def reset_screen():
+    global current_screen
+    current_screen = 4
     window.title("Tasks - Reset Data")
     menu(0)
     init_screen()
@@ -441,6 +607,8 @@ def update_task_status():
 
 
 def change_task_details(task_id):
+    global current_screen
+    current_screen = 3
     init_screen()
 
     for task in tasks_to_display:
@@ -494,7 +662,9 @@ def change_task_details(task_id):
 
     def place_submit_button():
         nonlocal submit_button
-        submit_button.grid(row=4, pady=50, columnspan=10)
+        global current_screen
+        if current_screen == 3:
+            submit_button.grid(row=4, pady=50, columnspan=10)
 
     def short_message(text):
         nonlocal submit_button
@@ -877,6 +1047,7 @@ def menu(action):
         file.add_command(label="Exit", command=window.destroy)
         edit.add_command(label="Sorting tasks", command=sort_settings_screen)
         edit.add_command(label="Appearance", command=appearance_settings_screen)
+        edit.add_command(label="User Name", command=change_name_screen)
         program_help.add_command(label="About", command=about_screen)
         program_help.add_command(label="Updates", command=update_screen)
         window.config(menu=menu_bar)
@@ -889,7 +1060,8 @@ def menu(action):
 def home_screen(startup=False):
     # main screen of the program, displays greet message, tasks pending info if any
     global user_name, time_greet_data, tasks_to_display, task_info_text
-    global pending_task_label, to_update
+    global pending_task_label, to_update, current_screen
+    current_screen = 1
     window.config(background="#ffffff")
     window.title("Tasks")
 
@@ -928,42 +1100,6 @@ def home_screen(startup=False):
             add_task_button.after(1000, lambda: check_for_updates(True))
 
 
-def error(code, sub_code):
-    # code 0 - critical error, stops the program from execution
-    # code 1 - file corrupt error, notify user, reset data files and relaunch program
-
-    if code == 0:
-        window.config(background="#ffffff")
-        init_screen()
-        Label(window, text="Critical Error", bg="#ffffff").grid()
-        error_label_text = f"Error Code: {sub_code}\n\nWe've run into an error, " \
-                           f"we had trouble while trying to access program files :(" \
-                           f"\n\n\nThis would most likely occur if the program " \
-                           f"has been installed in a system folder and is " \
-                           f"run without administrator privileges"
-        error_label = Label(window, text=error_label_text, wraplength=550)
-        error_label.grid()
-
-    if code == 1:
-        window.config(background="#ffffff")
-        init_screen()
-        Label(window, text="Runtime Error", bg="#ffffff", fg="red", font=('calibri', 16, 'bold')).grid(columnspan=4)
-        error_label_text = f"Error Code: {sub_code}\n\n\nWe've run into an error, something went " \
-                           f"wrong with the program files :(" \
-                           f"\n\nResetting program files might help, " \
-                           f"but you will lose all data associated with this program"
-        error_label = Label(window, text=error_label_text, bg="#ffffff", font=('calibri', 14))
-        error_label.grid(pady=(50, 10), padx=5, columnspan=4)
-        Button(window, text="Reset Data", cursor="hand2", relief="flat", command=reset_data, bg="#ffbcbc",
-               font=('calibri', 14), activebackground="#ffbcbc").grid(pady=50, column=1)
-        Button(window, text="Exit", cursor="hand2", relief="flat", command=window.destroy, bg="#bfffbc",
-               font=('calibri', 14), activebackground="#bfffbc").grid(pady=50, row=2, column=2)
-
-    if code == 3:
-        pass
-    # code 3 for runtime error while sorting tasks and such, most probably restart would fix
-
-
 def extract_tasks():
     # throw critical error if file corrupt - to be modified to a format error
     # extract tasks and add task object to tasks_to_display list
@@ -971,10 +1107,6 @@ def extract_tasks():
 
     with open(tasks_data_file, "r") as file:
         content = file.readlines()
-
-    if not len(content) == no_tasks_pending:
-        error(0, "FILE_CORRUPT")
-        return
 
     try:
         for i in content:
@@ -1093,10 +1225,13 @@ def initiate_data_files():
             return 0
 
         except FileNotFoundError:
-            with open(main_data_file, "a"):
-                pass
-            with open(tasks_data_file, "a"):
-                pass
+            try:
+                with open(main_data_file, "a"):
+                    pass
+                with open(tasks_data_file, "a"):
+                    pass
+            except PermissionError:
+                return -1
             return 1
 
     return -1
@@ -1164,27 +1299,11 @@ def first_launch_handler():
     place_submit_button()
 
 
-def update_window():
-    global user_program_version, latest_program_version
-    update_top = Toplevel(window)
-    update_top.config(background="#ffffff")
-    update_top.geometry("300x200")
-    update_top.title("Tasks - Update")
-    update_top.resizable(False, False)
-
-    info_label_text = "An Update is available, you are using an older version of this program" \
-                      f"\nNew version: {latest_program_version}\nYour version: {user_program_version}"
-    info_label = Label(update_top, text=info_label_text, bg="#ffffff")
-    info_label.grid(padx=(100, 100), columnspan=5)
-
-    update_top.attributes('-topmost', True)
-    update_top.update()
-    update_top.attributes('-topmost', False)
-
-
 def update_screen():
-    global check_update_at_startup
+    global check_update_at_startup, current_screen
+    current_screen = 8
     init_screen()
+    window.title("Tasks - Updates")
 
     info_label_text = "Checking for updates..."
     info_label = Label(window, text=info_label_text, font=(font_style, 16), bg="#ffffff")
@@ -1312,7 +1431,7 @@ def main():
             initiate_data_files()
 
         else:
-            error(0, "FILE_INIT_FAILED")
+            error(4, "PERMISSION_DENIED_FOR_FILE_INIT")
             return
 
     check_data = extract_data()
@@ -1369,7 +1488,8 @@ def update_index():
 
 
 if __name__ == '__main__':  # starter function
-    update_index()
-    main()
+    if can_start:
+        update_index()
+        main()
 
 window.mainloop()
